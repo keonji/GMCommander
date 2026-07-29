@@ -1,0 +1,389 @@
+-- run.lua — прогон аддона на эмуляции клиента.
+--   lua tests/run.lua
+
+package.path = "./tests/?.lua;" .. package.path
+local wow = require("wow_stub")
+
+local ROOT = "GMCommander/"
+local passed, failed = 0, 0
+
+local function ok(cond, label)
+  if cond then
+    passed = passed + 1
+    print("  \27[32mok\27[0m   " .. label)
+  else
+    failed = failed + 1
+    print("  \27[31mFAIL\27[0m " .. label)
+  end
+end
+
+local function eq(a, b, label)
+  ok(a == b, label .. (a == b and "" or ("  (получено: " .. tostring(a) ..
+     ", ожидалось: " .. tostring(b) .. ")")))
+end
+
+--- Прогнать очередь до конца и вернуть отправленное.
+local function flush()
+  wow.sent = {}
+  for _ = 1, 80 do
+    wow.now = wow.now + 1
+    wow.Tick()
+  end
+  return wow.sent
+end
+
+--- Последняя отправленная команда.
+local function lastCmd()
+  local s = flush()
+  return s[#s] and s[#s].text
+end
+
+------------------------------------------------------------------ загрузка
+
+local function readTOC(path)
+  local files, fh = {}, assert(io.open(path, "r"))
+  for raw in fh:lines() do
+    local line = raw:gsub("\r", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if line ~= "" and not line:match("^#") then
+      table.insert(files, (line:gsub("\\", "/")))
+    end
+  end
+  fh:close()
+  return files
+end
+
+local ADDON_NAME = "GMCommander"
+local ns = {}
+
+print("\n\27[1mЗагрузка файлов из .toc\27[0m")
+for _, rel in ipairs(readTOC(ROOT .. "GMCommander.toc")) do
+  local chunk, err = loadfile(ROOT .. rel)
+  if not chunk then
+    print("  \27[31mFAIL\27[0m " .. rel .. ": " .. tostring(err))
+    failed = failed + 1
+  else
+    local success, rerr = pcall(chunk, ADDON_NAME, ns)
+    if success then
+      passed = passed + 1
+      print("  \27[32mok\27[0m   " .. rel)
+    else
+      failed = failed + 1
+      print("  \27[31mFAIL\27[0m " .. rel .. ": " .. tostring(rerr))
+    end
+  end
+end
+
+------------------------------------------------------------------ события
+
+print("\n\27[1mСобытия загрузки\27[0m")
+local s1, e1 = pcall(wow.Fire, "ADDON_LOADED", ADDON_NAME)
+ok(s1, "ADDON_LOADED отработал" .. (s1 and "" or ": " .. tostring(e1)))
+ok(ns.db ~= nil, "SavedVariables инициализированы")
+
+s1, e1 = pcall(wow.Fire, "PLAYER_LOGIN")
+ok(s1, "PLAYER_LOGIN отработал" .. (s1 and "" or ": " .. tostring(e1)))
+ok(ns.UI and ns.UI.frame ~= nil, "окно построено")
+ok(ns.Bar and ns.Bar.frame ~= nil, "полоса построена")
+eq(#ns.UI.pages, 5, "зарегистрировано 5 вкладок")
+
+print("\n\27[1mПереключение вкладок\27[0m")
+ns.UI.frame:Show()
+for i, page in ipairs(ns.UI.pages) do
+  local s, e = pcall(function() ns.UI:Select(i) end)
+  ok(s, "вкладка «" .. page.title .. "» открывается" .. (s and "" or ": " .. tostring(e)))
+end
+
+------------------------------------------------------- формат команд
+
+print("\n\27[1mФормат отправки\27[0m")
+ns.Comm:Clear()
+ns.Run("revive")
+eq(ns.Comm:Pending(), 1, "команда встала в очередь")
+local sent = flush()
+eq(sent[1] and sent[1].text, ".revive", "точка добавлена автоматически")
+eq(sent[1] and sent[1].channel, "SAY", "уходит каналом SAY")
+
+-- Троттлинг: две команды не уходят одним кадром.
+ns.Comm:Clear()
+wow.sent = {}
+ns.Run("a"); ns.Run("b")
+wow.now = wow.now + 10
+wow.Tick()
+eq(#wow.sent, 1, "за один кадр уходит только одна команда")
+wow.now = wow.now + 10
+wow.Tick()
+eq(#wow.sent, 2, "вторая уходит после паузы")
+
+------------------------------------------------------------- деньги
+
+print("\n\27[1mДеньги и уровни\27[0m")
+ns.Comm:Clear()
+ns.GiveMoney(100 * 10000)
+eq(lastCmd(), ".modify money 1000000", "100 золота = 1000000 меди")
+
+ns.Comm:Clear()
+ns.AddLevels(5)
+eq(lastCmd(), ".character levelup 5", "прирост уровня уходит как есть")
+
+-- SetLevel считает разницу: сервер принимает прирост, не итог.
+wow.world.player.level = 12
+wow.world.target = nil
+ns.Comm:Clear()
+ns.SetLevel(80)
+eq(lastCmd(), ".character levelup 68", "до 80 с 12 — прирост 68")
+
+ns.Comm:Clear()
+ns.SetLevel(12)
+eq(ns.Comm:Pending(), 0, "если уровень уже нужный, команда не шлётся")
+
+-- Понижение уровня — отрицательный прирост.
+ns.Comm:Clear()
+ns.SetLevel(5)
+eq(lastCmd(), ".character levelup -7", "понижение уходит отрицательным")
+
+------------------------------------------------------------ цель
+
+print("\n\27[1mВыбор цели\27[0m")
+wow.world.target = nil
+eq(ns.TargetName(), nil, "без выделения цели нет")
+eq(ns.TargetLabel(), wow.world.player.name, "команды идут игроку")
+
+wow.world.target = { name = "Пётр", level = 40, class = "MAGE" }
+eq(ns.TargetName(), "Пётр", "цель распознана")
+eq(ns.TargetLabel(), "Пётр", "команды пойдут цели")
+
+ns.db.applyToTarget = false
+eq(ns.TargetLabel(), wow.world.player.name, "при снятой галочке — игроку")
+ns.db.applyToTarget = true
+
+-- SetLevel учитывает уровень цели, а не свой.
+ns.Comm:Clear()
+ns.SetLevel(45)
+eq(lastCmd(), ".character levelup 5", "прирост считается от уровня цели (40 -> 45)")
+wow.world.target = nil
+
+--------------------------------------------------- опасные команды
+
+print("\n\27[1mЗащита от необратимого\27[0m")
+ns.db.confirmRisky = true
+ns.Comm:Clear()
+ns.Run("character erase Вася")
+eq(ns.Comm:Pending(), 0, "удаление персонажа требует подтверждения")
+ok(ns._confirm and ns._confirm:IsShown(), "показан диалог")
+wow.Click(ns._confirm._yes)
+eq(ns.Comm:Pending(), 1, "после подтверждения команда уходит")
+
+-- «Убить» без цели предупреждает, что убьёт вас.
+ns.Comm:Clear()
+wow.world.target = nil
+local dieAction
+for _, a in ipairs(ns.ACTIONS) do
+  if a.cmd == "die" then dieAction = a end
+end
+ok(dieAction ~= nil, "действие «Убить» есть в списке")
+ns.DoAction(dieAction)
+eq(ns.Comm:Pending(), 0, "без цели команда не уходит сразу")
+ok(ns._confirm:IsShown(), "предупреждение показано")
+wow.Click(ns._confirm._yes)
+eq(ns.Comm:Pending(), 1, "после подтверждения уходит")
+
+-- С целью — без лишнего диалога.
+ns.Comm:Clear()
+ns.db.confirmRisky = false
+wow.world.target = { name = "Цель", level = 5, class = "ROGUE" }
+ns.DoAction(dieAction)
+eq(ns.Comm:Pending(), 1, "с целью уходит без подтверждения")
+wow.world.target = nil
+ns.db.confirmRisky = true
+
+------------------------------------------------------- переключатели
+
+print("\n\27[1mПереключатели режимов\27[0m")
+ns.db.toggles = {}
+local flyAction
+for _, a in ipairs(ns.ACTIONS) do
+  if a.toggle == "gm fly" then flyAction = a end
+end
+ok(flyAction ~= nil, "действие «Полёт» найдено")
+
+ns.Comm:Clear()
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly on", "первое нажатие включает")
+eq(ns.db.toggles["gm fly"], true, "состояние запомнено")
+
+ns.Comm:Clear()
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly off", "второе нажатие выключает")
+eq(ns.db.toggles["gm fly"], false, "состояние обновлено")
+
+--------------------------------------------------------- предметы
+
+print("\n\27[1mПредметы\27[0m")
+ns.db.history = {}
+ns.Comm:Clear()
+ns.GiveItem(6948, 3)
+eq(lastCmd(), ".additem 6948 3", "команда выдачи собрана верно")
+eq(#ns.db.history, 1, "предмет попал в историю")
+eq(ns.db.history[1].id, 6948, "id сохранён")
+
+-- Повторная выдача не плодит дубликаты, а поднимает наверх.
+ns.GiveItem(1234, 1)
+ns.GiveItem(6948, 5)
+eq(#ns.db.history, 2, "дубликат не добавлен")
+eq(ns.db.history[1].id, 6948, "повторный поднялся наверх")
+eq(ns.db.history[1].count, 5, "количество обновилось")
+
+-- История ограничена.
+for i = 1, 30 do ns.GiveItem(10000 + i, 1) end
+ok(#ns.db.history <= 12, "история не растёт бесконечно (" .. #ns.db.history .. ")")
+
+-- Разбор ссылок.
+eq(ns.ParseItemLink("|cffffffff|Hitem:6948:0:0:0:0:0:0:0:80|h[Камень]|h|r"), 6948,
+   "ID вынут из ссылки предмета")
+eq(ns.ParseItemLink("  4321  "), 4321, "число принято как ID")
+eq(ns.ParseItemLink("Frostweave Bag"), nil, "текст без ID отвергнут")
+eq(ns.ParseItemLink(nil), nil, "nil не роняет разбор")
+
+-- Наборы.
+ns.Comm:Clear()
+local kit = ns.ITEM_KITS[2]   -- еда и вода, два предмета
+ns.GiveKit(kit)
+eq(ns.Comm:Pending(), #kit.items, "набор ставит по команде на предмет")
+
+--------------------------------------------------------- обучение
+
+print("\n\27[1mОбучение\27[0m")
+ns.Comm:Clear()
+ns.LearnProfession(ns.PROFESSIONS[1])
+eq(lastCmd(), ".learn 2018 all", "профессия учится со всеми рангами")
+
+-- Все ID профессий — числа, и они различны.
+local seen, dupes = {}, 0
+for _, p in ipairs(ns.PROFESSIONS) do
+  ok(type(p.spell) == "number" and p.spell > 0,
+     "у профессии «" .. p.ru .. "» задан ID")
+  if seen[p.spell] then dupes = dupes + 1 end
+  seen[p.spell] = true
+end
+eq(dupes, 0, "ID профессий не повторяются")
+
+-------------------------------------------------------- телепорты
+
+print("\n\27[1mТелепорты\27[0m")
+ns.Comm:Clear()
+ns.Teleport({ tele = "Dalaran", ru = "Даларан" })
+eq(lastCmd(), ".teleport Dalaran", "телепорт по имени из базы")
+
+ns.Comm:Clear()
+ns.GoQuest(1234, "starter")
+eq(lastCmd(), ".go quest starter 1234", "прыжок к выдающему квест")
+
+ns.Comm:Clear()
+ns.GoQuest(1234, "ender")
+eq(lastCmd(), ".go quest ender 1234", "прыжок к принимающему")
+
+-- Избранное.
+ns.db.favorites = {}
+local dal = { tele = "Dalaran", ru = "Даларан" }
+ok(not ns.IsFavorite("Dalaran"), "изначально не в избранном")
+ns.ToggleFavorite(dal)
+ok(ns.IsFavorite("Dalaran"), "добавлено в избранное")
+eq(#ns.db.favorites, 1, "запись одна")
+ns.ToggleFavorite(dal)
+ok(not ns.IsFavorite("Dalaran"), "убрано из избранного")
+eq(#ns.db.favorites, 0, "список пуст")
+
+-- Все точки заданы непустыми строками.
+local badTele = 0
+local function checkList(list)
+  for _, e in ipairs(list) do
+    if type(e.tele) ~= "string" or e.tele == "" then badTele = badTele + 1 end
+    if type(e.ru) ~= "string" or e.ru == "" then badTele = badTele + 1 end
+  end
+end
+checkList(ns.TELE_CITIES)
+for _, g in ipairs(ns.TELE_DUNGEONS) do checkList(g.list) end
+for _, g in ipairs(ns.TELE_RAIDS) do checkList(g.list) end
+eq(badTele, 0, "у всех точек есть имя в базе и русская подпись")
+
+------------------------------------------------------ слэш-команды
+
+print("\n\27[1mСлэш-команды\27[0m")
+local slash = SlashCmdList["GMCOMMANDER"]
+ok(type(slash) == "function", "обработчик /gm зарегистрирован")
+
+ns.Comm:Clear()
+slash("tp Даларан")
+eq(lastCmd(), ".teleport Dalaran", "«/gm tp Даларан» нашёл русское имя")
+
+ns.Comm:Clear()
+slash("tp Оргриммар")
+eq(lastCmd(), ".teleport Orgrimmar", "русские имена ищутся по всем спискам")
+
+ns.Comm:Clear()
+slash("tp Ульдуар")
+eq(lastCmd(), ".teleport UlduarRaid", "рейды тоже находятся")
+
+-- Неизвестное имя уходит серверу как есть: в game_tele ~2000 точек,
+-- наш список покрывает не все.
+ns.Comm:Clear()
+slash("tp SomeUnknownPlace")
+eq(lastCmd(), ".teleport SomeUnknownPlace", "неизвестное имя отдаётся серверу")
+
+ns.Comm:Clear()
+slash("item 6948 2")
+eq(lastCmd(), ".additem 6948 2", "«/gm item» выдаёт предмет")
+
+ns.Comm:Clear()
+slash("gold 500")
+eq(lastCmd(), ".modify money 5000000", "«/gm gold 500» переводит в медь")
+
+wow.world.player.level = 10
+ns.Comm:Clear()
+slash("lvl 60")
+eq(lastCmd(), ".character levelup 50", "«/gm lvl 60» считает прирост")
+
+ns.Comm:Clear()
+slash("quest 42")
+eq(lastCmd(), ".go quest starter 42", "«/gm quest» прыгает к квестгиверу")
+
+ns.Comm:Clear()
+slash("modify speed 3")
+eq(lastCmd(), ".modify speed 3", "произвольная команда уходит как есть")
+
+for _, cmd in ipairs({ "help", "bar", "" }) do
+  local s, e = pcall(slash, cmd)
+  ok(s, "«/gm " .. cmd .. "» не падает" .. (s and "" or ": " .. tostring(e)))
+end
+ns.db.bar = true
+
+--------------------------------------------------- отрисовка
+
+print("\n\27[1mОтрисовка\27[0m")
+for i, p in ipairs(ns.UI.pages) do
+  ns.UI:Select(i)
+  local s, e = pcall(function() ns.UI:Refresh() end)
+  ok(s, "«" .. p.title .. "» переживает Refresh" .. (s and "" or ": " .. tostring(e)))
+end
+
+-- Смена цели не должна ронять отрисовку.
+wow.world.target = { name = "Цель", level = 70, class = "PRIEST" }
+local s2, e2 = pcall(wow.Fire, "PLAYER_TARGET_CHANGED")
+ok(s2, "смена цели обрабатывается" .. (s2 and "" or ": " .. tostring(e2)))
+wow.world.target = nil
+s2, e2 = pcall(wow.Fire, "PLAYER_TARGET_CHANGED")
+ok(s2, "снятие цели обрабатывается")
+
+-- Пустое избранное и заполненная история — частые крайние случаи.
+ns.db.favorites = {}
+ns.UI:Select(2)
+s2, e2 = pcall(function() ns.UI:Refresh() end)
+ok(s2, "пустое избранное не ломает список" .. (s2 and "" or ": " .. tostring(e2)))
+
+--------------------------------------------------------------------- итог
+
+print(string.format("\n\27[1mИтого:\27[0m %d пройдено, %s\n",
+  passed, failed == 0 and "\27[32m0 провалено\27[0m"
+                      or ("\27[31m" .. failed .. " провалено\27[0m")))
+
+os.exit(failed == 0 and 0 or 1)

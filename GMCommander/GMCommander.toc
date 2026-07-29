@@ -1,0 +1,22 @@
+## Interface: 30300
+## Title: |cffffcc00GM|rCommander
+## Notes: Панель GM-команд для AzerothCore 3.3.5a
+## Author: keonji
+## Version: 1.0.0
+## SavedVariables: GMCommanderDB
+
+Modules\Compat.lua
+Modules\Config.lua
+Modules\Const.lua
+Modules\Comm.lua
+Modules\Theme.lua
+Modules\Widgets.lua
+GMCommander.lua
+Modules\UI_Main.lua
+Modules\UI_Player.lua
+Modules\UI_Teleport.lua
+Modules\UI_Items.lua
+Modules\UI_Learn.lua
+Modules\UI_Settings.lua
+Modules\Bar.lua
+Modules\Slash.lua
