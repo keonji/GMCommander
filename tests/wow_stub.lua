@@ -93,6 +93,8 @@ function Frame:EnableMouseWheel() end
 function Frame:SetMovable() end
 function Frame:SetClampedToScreen() end
 function Frame:SetFrameStrata() end
+function Frame:SetFrameLevel(v) self._level = v end
+function Frame:GetFrameLevel() return self._level or 1 end
 function Frame:SetToplevel() end
 function Frame:StartMoving() end
 function Frame:StopMovingOrSizing() end

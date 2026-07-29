@@ -37,6 +37,35 @@ function Comm:Clear()
   wipe(queue)
 end
 
+--- Каким каналом отправить команду.
+--
+-- Серверу тип канала безразличен: GM-команду он перехватывает по точке
+-- в начале строки (ChatHandler.cpp:307) — причём ДО проверки на смерть
+-- (ChatHandler.cpp:376). То есть команда мёртвого персонажа сработала
+-- бы, если бы её удалось отправить.
+--
+-- Мешает клиент: канал SAY у мёртвого заблокирован на его стороне, и
+-- сообщение до сервера просто не доходит. А вот WHISPER работает и в
+-- виде духа — им и пользуемся, отправляя команду любому персонажу.
+-- Получатель её не увидит: сервер забирает сообщение себе.
+--
+-- @return channel, target — target равен nil для SAY
+function Comm:PickChannel()
+  local dead = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
+  if not dead then
+    return "SAY", nil
+  end
+
+  -- Пустая настройка означает «шептать себе»: получатель есть всегда,
+  -- и на чужого персонажа рассчитывать не нужно.
+  local to = ns.db and ns.db.deadWhisperTarget
+  if not to or to == "" then
+    to = UnitName("player")
+  end
+
+  return "WHISPER", to
+end
+
 pump:SetScript("OnUpdate", function()
   if #queue == 0 then return end
   local now = GetTime()
@@ -46,10 +75,8 @@ pump:SetScript("OnUpdate", function()
   local item = table.remove(queue, 1)
   lastSend = now
 
-  -- Канал не важен: сервер забирает сообщение по точке в начале и
-  -- в чат его не пропускает. SAY выбран как всегда доступный —
-  -- в отличие от PARTY, который требует группы.
-  SendChatMessage(item.text, "SAY")
+  local channel, target = Comm:PickChannel()
+  SendChatMessage(item.text, channel, nil, target)
 
   if ns.db and ns.db.echo and not item.quiet then
     ns.Print("|cff808080" .. item.text .. "|r")

@@ -60,18 +60,38 @@ function page.build(parent)
     "GM-команды идут обычным чатом, а на чат действует антиспам сервера.\n" ..
     "Слишком малая пауза — часть команд из набора потеряется.")
 
-  ------------------------------------------------------------- права
-  y = y + 10
-  local h3 = T:Text(parent, "О правах", 11, T.color.accent)
-  h3:SetPoint("TOPLEFT", pad, nextY(20))
+  ------------------------------------------------- команды после смерти
+  y = y + 8
+  local hDead = T:Text(parent, "Команды в виде духа", 11, T.color.accent)
+  hDead:SetPoint("TOPLEFT", pad, nextY(20))
 
-  local rights = T:Text(parent,
-    "Аддон только отправляет команды — доступ решает сервер по уровню\n" ..
-    "вашего аккаунта. Если команда не срабатывает молча, скорее всего\n" ..
-    "не хватает прав: выдайте их в консоли сервера командой\n" ..
-    "|cffffcc00account set gmlevel ИМЯ 3 -1|r и перезайдите в игру.",
+  local deadNote = T:Text(parent,
+    "Мёртвому клиент запрещает писать в /say, поэтому команды уходят\n" ..
+    "шёпотом — серверу канал безразличен. Пусто = шептать себе.",
     9, T.color.textDim)
-  rights:SetPoint("TOPLEFT", pad, nextY(64))
+  deadNote:SetPoint("TOPLEFT", pad, nextY(30))
+  deadNote:SetPoint("RIGHT", parent, "RIGHT", -pad, 0)
+  deadNote:SetJustifyH("LEFT")
+
+  local deadEdit = W:EditBox(parent, "имя для шёпота (пусто = себе)", function(text)
+    ns.db.deadWhisperTarget = text
+    ns.Print(text ~= "" and ("Команды в виде духа пойдут шёпотом: " .. text)
+                        or "Команды в виде духа пойдут шёпотом вам самому.")
+  end)
+  deadEdit:SetPoint("TOPLEFT", pad, nextY(30))
+  deadEdit:SetWidth(220)
+  deadEdit._edit:SetText(ns.db.deadWhisperTarget or "")
+
+  ------------------------------------------------------------- права
+  -- Текст короткий намеренно: с блоком «команды в виде духа» вкладка
+  -- перестала помещаться в 460x520, а подробности всё равно есть в
+  -- README и в подсказке ниже.
+  y = y + 6
+  local rights = T:Text(parent,
+    "Права на команды решает сервер. Не работают молча — выдайте:\n" ..
+    "|cffffcc00account set gmlevel ИМЯ 3 -1|r и перезайдите.",
+    9, T.color.textDim)
+  rights:SetPoint("TOPLEFT", pad, nextY(34))
   rights:SetPoint("RIGHT", parent, "RIGHT", -pad, 0)
   rights:SetJustifyH("LEFT")
 

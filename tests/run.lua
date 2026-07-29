@@ -86,6 +86,22 @@ ok(ns.UI and ns.UI.frame ~= nil, "окно построено")
 ok(ns.Bar and ns.Bar.frame ~= nil, "полоса построена")
 eq(#ns.UI.pages, 6, "зарегистрировано 6 вкладок")
 
+print("\n\27[1mКнопка закрытия\27[0m")
+-- Ищем кнопку по её обработчику: у неё OnClick скрывает главное окно.
+-- Раньше кнопка не работала, потому что не имела текстуры (нечему было
+-- принимать мышь) и лежала под шапкой, которая перехватывала клики.
+do
+  local closeBtn = ns.UI.closeButton
+  ok(closeBtn ~= nil, "кнопка закрытия доступна как UI.closeButton")
+  if closeBtn then
+    ns.UI.frame:Show()
+    ok(ns.UI.frame:IsShown(), "окно открыто перед проверкой")
+    wow.Click(closeBtn)
+    ok(not ns.UI.frame:IsShown(), "клик по кнопке закрывает окно")
+    ns.UI.frame:Show()
+  end
+end
+
 print("\n\27[1mПереключение вкладок\27[0m")
 ns.UI.frame:Show()
 for i, page in ipairs(ns.UI.pages) do
@@ -113,6 +129,48 @@ eq(#wow.sent, 1, "за один кадр уходит только одна ко
 wow.now = wow.now + 10
 wow.Tick()
 eq(#wow.sent, 2, "вторая уходит после паузы")
+
+--------------------------------------------- команды в виде духа
+
+print("\n\27[1mКоманды после смерти\27[0m")
+
+-- Живому команда идёт в SAY.
+wow.world.player.dead = false
+ns.Comm:Clear()
+ns.Run("revive")
+local s0 = flush()
+eq(s0[1] and s0[1].channel, "SAY", "живой отправляет в SAY")
+eq(s0[1] and s0[1].to, nil, "получателя нет")
+
+-- Мёртвому клиент запрещает SAY, поэтому уходит шёпот. Серверу канал
+-- безразличен: команду он перехватывает по точке до проверки на смерть
+-- (ChatHandler.cpp:307 против 376).
+wow.world.player.dead = true
+ns.Comm:Clear()
+ns.Run("revive")
+local s1d = flush()
+eq(s1d[1] and s1d[1].channel, "WHISPER", "мёртвый отправляет шёпотом")
+eq(s1d[1] and s1d[1].to, wow.world.player.name,
+   "по умолчанию шёпот самому себе — получатель есть всегда")
+eq(s1d[1] and s1d[1].text, ".revive", "текст команды не изменился")
+
+-- Заданное имя используется вместо своего. Команда взята безобидная:
+-- у «die» сработал бы диалог подтверждения, и в очередь ничего бы не
+-- встало.
+ns.db.deadWhisperTarget = "Перекуп"
+ns.Comm:Clear()
+ns.Run("gear repair")
+local s2d = flush()
+eq(s2d[1] and s2d[1].to, "Перекуп", "шёпот уходит указанному персонажу")
+
+-- Пустая настройка снова означает «себе».
+ns.db.deadWhisperTarget = ""
+ns.Comm:Clear()
+ns.Run("gear repair")
+local s3d = flush()
+eq(s3d[1] and s3d[1].to, wow.world.player.name, "пустое имя = шёпот себе")
+
+wow.world.player.dead = false
 
 ------------------------------------------------------------- деньги
 

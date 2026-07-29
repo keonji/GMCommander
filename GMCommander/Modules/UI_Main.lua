@@ -13,16 +13,40 @@ function ns.RegisterPage(def)
   table.insert(UI.pages, def)
 end
 
-local function styleCloseButton(parent)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetWidth(20); b:SetHeight(20)
+--- Кнопка закрытия окна.
+-- @param window фрейм, который надо скрыть
+-- @param holder фрейм-родитель кнопки (шапка окна)
+local function styleCloseButton(window, holder)
+  -- Кнопка кладётся В ШАПКУ, а не в само окно: шапка перехватывает
+  -- мышь для перетаскивания и, будучи нарисованной поверх, съедала
+  -- клики по кнопке-сестре.
+  local b = CreateFrame("Button", nil, holder)
+  b:SetWidth(22); b:SetHeight(22)
+
+  -- Своя заливка обязательна: без текстуры у кнопки нет области,
+  -- принимающей мышь, — кликался бы только сам глиф. Именно из-за
+  -- этого крестик раньше не срабатывал.
+  local bg = T:Fill(b, { 0, 0, 0, 0.01 }, "ARTWORK")
+
+  b:EnableMouse(true)
+  b:RegisterForClicks("LeftButtonUp")
+  b:SetFrameLevel(holder:GetFrameLevel() + 5)
+
   -- Латинская X, а не знак умножения U+00D7: последнего нет в CP1251,
   -- и русский клиент 3.3.5a рисует на его месте букву «Ч».
-  local x = T:Text(b, "X", 15, T.color.textDim)
+  local x = T:Text(b, "X", 14, T.color.textDim)
   x:SetPoint("CENTER", 0, 0)
-  b:SetScript("OnEnter", function() x:SetTextColor(T.unpackc(T.color.bad)) end)
-  b:SetScript("OnLeave", function() x:SetTextColor(T.unpackc(T.color.textDim)) end)
-  b:SetScript("OnClick", function() parent:Hide() end)
+
+  b:SetScript("OnEnter", function()
+    x:SetTextColor(T.unpackc(T.color.bad))
+    bg:SetVertexColor(1, 1, 1, 0.10)
+  end)
+  b:SetScript("OnLeave", function()
+    x:SetTextColor(T.unpackc(T.color.textDim))
+    bg:SetVertexColor(0, 0, 0, 0.01)
+  end)
+  b:SetScript("OnClick", function() window:Hide() end)
+
   return b
 end
 
@@ -61,8 +85,9 @@ function ns.BuildUI()
   local title = T:Text(head, "|cffffcc00GM|rCommander", 14)
   title:SetPoint("LEFT", 12, 0)
 
-  local close = styleCloseButton(f)
-  close:SetPoint("TOPRIGHT", -6, -7)
+  local close = styleCloseButton(f, head)
+  close:SetPoint("RIGHT", head, "RIGHT", -6, 0)
+  UI.closeButton = close
 
   -- Перетаскивание за шапку.
   head:EnableMouse(true)
