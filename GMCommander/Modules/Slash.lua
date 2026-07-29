@@ -13,6 +13,8 @@ local function help()
     { "/gm item 6948 5", "выдать предмет" },
     { "/gm gold 500",    "выдать золото" },
     { "/gm lvl 80",      "поднять до уровня" },
+    { "/gm speed 5",     "скорость бега, полёта и плавания" },
+    { "/gm q add 1234",  "квест: add / complete / reward / remove / status" },
     { "/gm quest 1234",  "прыжок к выдающему квест" },
     { "/gm bar",         "показать или скрыть полосу" },
     { "/gm <команда>",   "любая GM-команда без точки" },
@@ -114,7 +116,40 @@ SlashCmdList["GMCOMMANDER"] = function(msg)
     return
   end
 
-  -- Квест.
+  -- Скорость.
+  local speed = msg:match("^[Ss][Pp][Ee][Ee][Dd]%s+([%d%.]+)$")
+             or msg:match("^скорость%s+([%d%.]+)$")
+  if speed then
+    ns.SetSpeed(tonumber(speed))
+    return
+  end
+
+  -- Действия над квестом: «/gm q add 1234», «/gm q done 1234».
+  -- Класс %a — только латиница, кириллические синонимы им не ловятся,
+  -- поэтому берём всё до пробела перед числом.
+  local qcmd, qid = msg:match("^[Qq]%s+(%S+)%s+(%d+)$")
+  if qcmd and qid then
+    -- Ключи в скобках: кириллица недопустима в обычной записи полей
+    -- таблицы Lua (идентификаторы только из латиницы).
+    local map = {
+      add = "add", give = "add", ["выдать"] = "add",
+      complete = "complete", done = "complete", ["завершить"] = "complete",
+      reward = "reward", ["наградить"] = "reward",
+      remove = "remove", ["убрать"] = "remove",
+      status = "status", ["статус"] = "status",
+    }
+    local action = map[qcmd:lower()]
+    if action then
+      ns.QuestAction(action, tonumber(qid))
+      ns.Print(string.format("Квест %s: %s.", qid, action))
+    else
+      ns.Print("Неизвестное действие: " .. qcmd ..
+               " (add / complete / reward / remove / status)")
+    end
+    return
+  end
+
+  -- Прыжок к квестгиверу.
   local quest = msg:match("^[Qq][Uu][Ee][Ss][Tt]%s+(%d+)$") or msg:match("^квест%s+(%d+)$")
   if quest then
     ns.GoQuest(tonumber(quest), "starter")

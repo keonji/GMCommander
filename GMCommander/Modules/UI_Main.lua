@@ -174,16 +174,19 @@ function UI:Refresh()
   local page = self.pages[self.current]
   if page and page.refresh then page.refresh() end
 
-  -- В подвале — на кого подействует следующая команда. Это самая
-  -- частая причина ошибки: нажать «Убить», забыв про выделение.
-  local target = ns.TargetName()
-  if target and ns.db.applyToTarget then
-    self.status:SetText("Цель: |cffffcc00" .. target .. "|r")
-  elseif target then
-    self.status:SetText("Цель: " .. target ..
-      " |cff808080(команды идут вам — переключите в настройках)|r")
+  -- В подвале — на кого подействует следующая команда. Показываем и
+  -- NPC: `.die`, `.respawn` и прочие работают по любому юниту, а
+  -- надпись «цель не выбрана» при выделенном мобе сбивала с толку.
+  local name, isPlayer = ns.TargetDisplayName()
+  if not name then
+    self.status:SetText("Цель не выбрана")
+  elseif not isPlayer then
+    self.status:SetText("Цель: |cffffcc00" .. name .. "|r |cff808080(существо)|r")
+  elseif ns.db.applyToTarget then
+    self.status:SetText("Цель: |cffffcc00" .. name .. "|r")
   else
-    self.status:SetText("Цель не выбрана — команды применятся к вам")
+    self.status:SetText("Цель: " .. name ..
+      " |cff808080(команды идут вам — переключите в настройках)|r")
   end
 
   self:RefreshQueue()

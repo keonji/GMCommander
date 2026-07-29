@@ -53,10 +53,39 @@ function page.build(parent)
   moneyEdit:SetPoint("TOPLEFT", pad + x, -afterActions - 18)
   moneyEdit:SetWidth(110)
 
-  ------------------------------------------------------------ уровни
+  ----------------------------------------------------------- скорость
   local afterMoney = afterActions + 52
+  local h2b = T:Text(parent, "Скорость", 11, T.color.accent)
+  h2b:SetPoint("TOPLEFT", pad, -afterMoney)
+
+  x = 0
+  for _, v in ipairs(ns.SPEED_STEPS) do
+    local b = W:Button(parent, {
+      text = "×" .. v, width = 52, height = 24,
+      tip = "Скорость ×" .. v,
+      tipBody = (v == 1 and "Вернуть обычную скорость." or
+                 "Ускоряет бег, полёт и плавание разом.") ..
+                "\n\nКоманда: .modify speed " .. v,
+      onClick = function() ns.SetSpeed(v) end,
+    })
+    b:SetPoint("TOPLEFT", pad + x, -afterMoney - 18)
+    x = x + 56
+  end
+
+  local speedEdit = W:EditBox(parent, "своё значение", function(text)
+    local v = tonumber(text)
+    if v then ns.SetSpeed(v) else ns.Print("Введите число.") end
+  end)
+  speedEdit:SetPoint("TOPLEFT", pad + x, -afterMoney - 18)
+  speedEdit:SetWidth(120)
+  W.Tooltip(speedEdit, "Своя скорость",
+    string.format("От %s до %s. Меняет бег, полёт и плавание сразу.",
+      ns.SPEED_MIN, ns.SPEED_MAX))
+
+  ------------------------------------------------------------ уровни
+  local afterSpeed = afterMoney + 52
   local h3 = T:Text(parent, "Уровень", 11, T.color.accent)
-  h3:SetPoint("TOPLEFT", pad, -afterMoney)
+  h3:SetPoint("TOPLEFT", pad, -afterSpeed)
 
   x = 0
   for _, d in ipairs(ns.LEVEL_STEPS) do
@@ -68,7 +97,7 @@ function page.build(parent)
                 "\n\nСервер принимает прирост, а не итоговый уровень.",
       onClick = function() ns.AddLevels(d) end,
     })
-    b:SetPoint("TOPLEFT", pad + x, -afterMoney - 18)
+    b:SetPoint("TOPLEFT", pad + x, -afterSpeed - 18)
     x = x + 56
   end
 
@@ -77,7 +106,7 @@ function page.build(parent)
     tip = "Поднять до максимального уровня",
     onClick = function() ns.SetLevel(ns.MAX_LEVEL) end,
   })
-  b80:SetPoint("TOPLEFT", pad + x, -afterMoney - 18)
+  b80:SetPoint("TOPLEFT", pad + x, -afterSpeed - 18)
   x = x + 72
 
   levelEdit = W:EditBox(parent, "точный уровень", function(text)
@@ -88,7 +117,7 @@ function page.build(parent)
     end
     ns.SetLevel(lvl)
   end)
-  levelEdit:SetPoint("TOPLEFT", pad + x, -afterMoney - 18)
+  levelEdit:SetPoint("TOPLEFT", pad + x, -afterSpeed - 18)
   levelEdit:SetWidth(110)
 
   -- Об опыте: команды нет, и это стоит объяснить прямо в интерфейсе,
@@ -96,22 +125,18 @@ function page.build(parent)
   local xpNote = T:Text(parent,
     "Опыт напрямую выдать нельзя: такой команды в AzerothCore нет — " ..
     "только уровни целиком.", 9, T.color.textDim)
-  xpNote:SetPoint("TOPLEFT", pad, -afterMoney - 46)
+  xpNote:SetPoint("TOPLEFT", pad, -afterSpeed - 46)
   xpNote:SetPoint("RIGHT", parent, "RIGHT", -pad, 0)
   xpNote:SetJustifyH("LEFT")
 
-  --------------------------------------------------------- своя команда
-  local free = T:Text(parent, "Произвольная команда", 11, T.color.accent)
-  free:SetPoint("BOTTOMLEFT", pad, 44)
-
-  local eb = W:EditBox(parent, "без точки: modify speed 3", function(text)
-    ns.Run(text)
-  end)
-  eb:SetPoint("BOTTOMLEFT", pad, 18)
-  eb:SetPoint("BOTTOMRIGHT", -pad, 18)
-
+  --------------------------------------------------------------------
+  -- Поля произвольной команды здесь больше нет: с добавлением скорости
+  -- и новых действий блоки перестали помещаться в 460×520 и налезали
+  -- друг на друга. Произвольная команда доступна через «/gm <текст>».
   infoLine = T:Text(parent, "", 9, T.color.textDim)
-  infoLine:SetPoint("BOTTOMLEFT", pad, 4)
+  infoLine:SetPoint("BOTTOMLEFT", pad, 14)
+  infoLine:SetPoint("RIGHT", parent, "RIGHT", -pad, 0)
+  infoLine:SetJustifyH("LEFT")
 end
 
 function page.refresh()
@@ -124,7 +149,9 @@ function page.refresh()
 
   if infoLine then
     local unit = (ns.TargetName() and ns.db.applyToTarget) and "target" or "player"
-    infoLine:SetText(string.format("Текущий уровень: %d", UnitLevel(unit) or 0))
+    infoLine:SetText(string.format(
+      "Текущий уровень: %d   |cff808080Произвольная команда — «/gm <текст>»|r",
+      UnitLevel(unit) or 0))
   end
 end
 

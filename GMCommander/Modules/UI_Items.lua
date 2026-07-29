@@ -34,21 +34,8 @@ function page.build(parent)
   idEdit:SetPoint("TOPLEFT", pad, -pad - 18)
   idEdit:SetWidth(250)
 
-  -- Shift+клик по предмету вставляет ссылку в активное поле ввода, но
-  -- только если игра знает про это поле. Клиент опрашивает открытые
-  -- фреймы через глобальную ChatEdit_InsertLink; перехватываем её и
-  -- отдаём ссылку своему полю, когда оно в фокусе.
-  do
-    local original = ChatEdit_InsertLink
-    ChatEdit_InsertLink = function(link)
-      if idEdit._edit:HasFocus() and link then
-        idEdit._edit:SetText(link)
-        return true
-      end
-      if original then return original(link) end
-      return false
-    end
-  end
+  -- Shift+клик по предмету вставляет ссылку в активное поле ввода.
+  ns.EnableLinkInsert(idEdit._edit)
 
   W.Tooltip(idEdit, "Предмет",
     "Введите числовой ID либо кликните с зажатым Shift по предмету " ..

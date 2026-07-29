@@ -212,7 +212,14 @@ _G.UnitExists = function(unit)
   return resolve(unit) ~= nil
 end
 
-_G.UnitIsPlayer = function(unit) return UnitExists(unit) end
+-- Цель может быть и NPC: у записи мира тогда стоит isNPC = true.
+-- Это принципиально для команд .die и .respawn, которые работают по
+-- любому юниту, тогда как .summon — только по игроку.
+_G.UnitIsPlayer = function(unit)
+  local m = resolve(unit)
+  if not m then return false end
+  return not m.isNPC
+end
 
 _G.UnitIsUnit = function(a, b)
   local na, nb = UnitName(a), UnitName(b)

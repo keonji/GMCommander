@@ -12,12 +12,33 @@ end
 -- Цель команды
 --------------------------------------------------------------------------
 
---- Имя выделенного игрока, если он выделен и это игрок.
+--- Есть ли вообще выделенная цель — игрок или NPC.
+-- Важно различать: `.die` и `.respawn` работают по любому юниту, а
+-- `.summon` и `.character levelup` — только по игроку.
+function ns.HasTarget()
+  return UnitExists("target") and true or false
+end
+
+--- Выделенная цель — игрок?
+function ns.TargetIsPlayer()
+  return UnitExists("target") and UnitIsPlayer("target") and true or false
+end
+
+--- Имя выделенного игрока. Для NPC возвращает nil: команды вроде
+--- `.summon` принимают только имена персонажей.
 function ns.TargetName()
-  if UnitExists("target") and UnitIsPlayer("target") then
+  if ns.TargetIsPlayer() then
     return UnitName("target")
   end
   return nil
+end
+
+--- Имя любой цели, включая NPC — только для показа в интерфейсе.
+function ns.TargetDisplayName()
+  if UnitExists("target") then
+    return UnitName("target"), ns.TargetIsPlayer()
+  end
+  return nil, false
 end
 
 --- Кого затронет команда — для подписи в интерфейсе.
@@ -66,14 +87,30 @@ function ns.DoAction(action)
     return
   end
 
-  -- Команды, работающие по выделению: сервер сам применит их к цели,
-  -- если она есть. Отдельного аргумента не нужно — предупреждаем
-  -- только про `die`, где отсутствие цели означает смерть игрока.
-  if action.cmd == "die" and not ns.TargetName() then
-    ns.W:Confirm("Убить себя?",
-      "Цель не выделена — команда убьёт вашего персонажа.",
-      function() ns.Comm:Send("die") end)
-    return
+  -- Команды с обязательным выделением. Сервер в этом случае отвечает
+  -- лишь строкой в чат, поэтому предупреждаем сами — иначе нажатие
+  -- выглядит как «ничего не произошло».
+  --
+  -- Тип цели важен: `.summon` не работает по NPC, `.respawn` — по
+  -- игроку, а `.die` принимает и то, и другое.
+  local need = action.needsTarget
+  if need then
+    local okTarget
+    if need == "player" then
+      okTarget = ns.TargetIsPlayer()
+    elseif need == "creature" then
+      okTarget = ns.HasTarget() and not ns.TargetIsPlayer()
+    else
+      okTarget = ns.HasTarget()
+    end
+
+    if not okTarget then
+      local what = (need == "creature" and "существо")
+                or (need == "player" and "игрока")
+                or "цель"
+      ns.Print("|cffffcc00" .. action.ru .. "|r: сначала выделите " .. what .. ".")
+      return
+    end
   end
 
   ns.Run(action.cmd)
@@ -106,6 +143,45 @@ function ns.SetLevel(target)
     return
   end
   ns.AddLevels(delta)
+end
+
+--------------------------------------------------------------------------
+-- Скорость
+--------------------------------------------------------------------------
+
+--- `.modify speed N` меняет бег, полёт и плавание разом
+--- (cs_modify.cpp:415). Допустимо от 0.1 до 50.
+function ns.SetSpeed(value)
+  if not value or value < ns.SPEED_MIN or value > ns.SPEED_MAX then
+    ns.Print(string.format("Скорость должна быть от %s до %s.",
+      ns.SPEED_MIN, ns.SPEED_MAX))
+    return
+  end
+  ns.Run("modify speed " .. value)
+  ns.Print(string.format("Скорость %s: ×%s", ns.TargetLabel(), value))
+end
+
+--------------------------------------------------------------------------
+-- Квесты
+--------------------------------------------------------------------------
+
+--- Действие над квестом: add / complete / reward / remove / status.
+function ns.QuestAction(cmd, questId)
+  if not questId then
+    ns.Print("|cffffcc00Укажите ID квеста|r.")
+    return
+  end
+  ns.Run("quest " .. cmd .. " " .. questId)
+end
+
+--- Достать ID квеста из ссылки |Hquest:ID:level|h[Название]|h.
+--- Такие ссылки приходят от `.lookup quest` и есть в журнале заданий.
+function ns.ParseQuestLink(text)
+  if not text then return nil end
+  local id = text:match("|Hquest:(%d+)")
+  if id then return tonumber(id) end
+  if text:match("^%s*%d+%s*$") then return tonumber(text) end
+  return nil
 end
 
 --------------------------------------------------------------------------
@@ -146,6 +222,50 @@ end
 --------------------------------------------------------------------------
 -- Обучение
 --------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+-- Вставка ссылок по Shift+клику
+--------------------------------------------------------------------------
+
+-- Клиент 3.3.5a вставляет ссылку в поле ввода через глобальную
+-- ChatEdit_InsertLink. Каждая вкладка со своим полем должна в ней
+-- поучаствовать, но городить цепочку перехватов на каждое поле —
+-- хрупко: порядок загрузки решает, чей обработчик сработает первым,
+-- а снять регистрацию потом нельзя. Поэтому перехват один, а поля
+-- регистрируются в списке.
+local linkTargets = {}
+
+--- Разрешить полю принимать Shift+клик, пока оно в фокусе.
+function ns.EnableLinkInsert(editBox)
+  table.insert(linkTargets, editBox)
+end
+
+do
+  local original = ChatEdit_InsertLink
+  ChatEdit_InsertLink = function(link)
+    if link then
+      for _, eb in ipairs(linkTargets) do
+        if eb:HasFocus() then
+          eb:SetText(link)
+          if ns.UI and ns.UI.Refresh then ns.UI:Refresh() end
+          return true
+        end
+      end
+    end
+    if original then return original(link) end
+    return false
+  end
+end
+
+--- Разобрать ввод заклинания: число либо ссылка |Hspell:ID|h,
+--- которую даёт Shift+клик по кнопке в книге заклинаний.
+function ns.ParseSpellInput(text)
+  if not text then return nil end
+  local id = text:match("|Hspell:(%d+)") or text:match("|Henchant:(%d+)")
+  if id then return tonumber(id) end
+  if text:match("^%s*%d+%s*$") then return tonumber(text) end
+  return nil
+end
 
 --- Выучить профессию со всеми рангами.
 -- `all` в конце заставляет ядро пройти всю цепочку рангов
@@ -205,12 +325,26 @@ end
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
+loader:RegisterEvent("PLAYER_ENTERING_WORLD")
 loader:SetScript("OnEvent", function(self, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON then
     ns.InitDB()
   elseif event == "PLAYER_LOGIN" then
     ns.BuildUI()
     ns.BuildBar()
+
+    -- Questie грузится своим чередом; на PLAYER_LOGIN его модули уже
+    -- на месте, но база может инициализироваться позже, поэтому
+    -- пробуем ещё раз при входе в мир.
+    ns.Questie:Probe()
+
     ns.Print("готов. |cffffcc00/gm|r — панель, |cffffcc00/gm help|r — команды.")
+    if ns.Questie.available then
+      ns.Print("база Questie подключена — названия квестов и их предметы доступны.")
+    end
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    if not ns.Questie.available then
+      ns.Questie:Probe()
+    end
   end
 end)

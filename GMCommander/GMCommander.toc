@@ -9,6 +9,7 @@ Modules\Compat.lua
 Modules\Config.lua
 Modules\Const.lua
 Modules\Comm.lua
+Modules\QuestieBridge.lua
 Modules\Theme.lua
 Modules\Widgets.lua
 GMCommander.lua
@@ -16,6 +17,7 @@ Modules\UI_Main.lua
 Modules\UI_Player.lua
 Modules\UI_Teleport.lua
 Modules\UI_Items.lua
+Modules\UI_Quests.lua
 Modules\UI_Learn.lua
 Modules\UI_Settings.lua
 Modules\Bar.lua
