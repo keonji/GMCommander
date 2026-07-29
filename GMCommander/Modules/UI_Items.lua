@@ -17,7 +17,7 @@ local function giveFromInput()
   end
   local count = tonumber(countEdit._edit:GetText()) or 1
   ns.GiveItem(id, count)
-  ns.Print(string.format("Выдано: предмет %d ×%d.", id, count))
+  ns.Print(string.format("Выдано: предмет %d x%d.", id, count))
   page.refresh()
 end
 
@@ -138,7 +138,7 @@ function page.refresh()
       histRows[i] = b
     end
     b:Show()
-    b:SetLabel(h.id .. (h.count > 1 and (" ×" .. h.count) or ""))
+    b:SetLabel(h.id .. (h.count > 1 and (" x" .. h.count) or ""))
     b:SetScript("OnClick", function() ns.GiveItem(h.id, h.count) end)
     W.Tooltip(b, "Выдать снова", "Предмет " .. h.id .. ", количество " .. h.count)
 

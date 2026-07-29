@@ -180,7 +180,7 @@ function page.build(parent)
       end
       local n = tonumber(itemCount._edit:GetText()) or 1
       ns.GiveItem(id, n)
-      ns.Print(string.format("Выдано: предмет %d ×%d.", id, n))
+      ns.Print(string.format("Выдано: предмет %d x%d.", id, n))
     end,
   })
   giveItem:SetPoint("TOPLEFT", pad + 216, -afterActions - 132)

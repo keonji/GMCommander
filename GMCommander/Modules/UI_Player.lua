@@ -61,8 +61,8 @@ function page.build(parent)
   x = 0
   for _, v in ipairs(ns.SPEED_STEPS) do
     local b = W:Button(parent, {
-      text = "×" .. v, width = 52, height = 24,
-      tip = "Скорость ×" .. v,
+      text = "x" .. v, width = 52, height = 24,
+      tip = "Скорость x" .. v,
       tipBody = (v == 1 and "Вернуть обычную скорость." or
                  "Ускоряет бег, полёт и плавание разом.") ..
                 "\n\nКоманда: .modify speed " .. v,
@@ -131,7 +131,7 @@ function page.build(parent)
 
   --------------------------------------------------------------------
   -- Поля произвольной команды здесь больше нет: с добавлением скорости
-  -- и новых действий блоки перестали помещаться в 460×520 и налезали
+  -- и новых действий блоки перестали помещаться в 460x520 и налезали
   -- друг на друга. Произвольная команда доступна через «/gm <текст>».
   infoLine = T:Text(parent, "", 9, T.color.textDim)
   infoLine:SetPoint("BOTTOMLEFT", pad, 14)

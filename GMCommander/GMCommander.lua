@@ -158,7 +158,7 @@ function ns.SetSpeed(value)
     return
   end
   ns.Run("modify speed " .. value)
-  ns.Print(string.format("Скорость %s: ×%s", ns.TargetLabel(), value))
+  ns.Print(string.format("Скорость %s: x%s", ns.TargetLabel(), value))
 end
 
 --------------------------------------------------------------------------

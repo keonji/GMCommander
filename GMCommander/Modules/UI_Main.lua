@@ -16,8 +16,10 @@ end
 local function styleCloseButton(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetWidth(20); b:SetHeight(20)
-  local x = T:Text(b, "×", 18, T.color.textDim)
-  x:SetPoint("CENTER", 0, 1)
+  -- Латинская X, а не знак умножения U+00D7: последнего нет в CP1251,
+  -- и русский клиент 3.3.5a рисует на его месте букву «Ч».
+  local x = T:Text(b, "X", 15, T.color.textDim)
+  x:SetPoint("CENTER", 0, 0)
   b:SetScript("OnEnter", function() x:SetTextColor(T.unpackc(T.color.bad)) end)
   b:SetScript("OnLeave", function() x:SetTextColor(T.unpackc(T.color.textDim)) end)
   b:SetScript("OnClick", function() parent:Hide() end)
