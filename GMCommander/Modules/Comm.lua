@@ -66,6 +66,84 @@ function Comm:PickChannel()
   return "WHISPER", to
 end
 
+--------------------------------------------------------------------------
+-- Почему нельзя звать SendChatMessage напрямую
+--------------------------------------------------------------------------
+--
+-- В 3.3.5a SendChatMessage — защищённая функция для сообщений, которые
+-- начинаются с точки или слэша: клиент считает их командами и требует
+-- «hardware event», то есть тот самый кадр, в котором игрок нажал
+-- кнопку или клавишу. Наша очередь работает из OnUpdate, где такого
+-- контекста уже нет, и клиент отвечает ошибкой «AddOn пытается
+-- выполнить защищённое действие».
+--
+-- Штатный путь, которым сам клиент отправляет GM-команды, — строка
+-- ввода чата: ChatEdit_SendText разбирает текст и вызывает защищённую
+-- часть уже из доверенного кода. Своей строке достаточно быть скрытой
+-- и наследовать шаблон ChatFrameEditBoxTemplate — видимый чат при этом
+-- не трогается: команда не появится ни в одном окне, потому что сервер
+-- перехватит её по точке.
+
+local sender
+
+local function ensureSender()
+  if sender then return sender end
+
+  -- Шаблон даёт ChatEdit_SendText всё, на что он рассчитывает:
+  -- chatType, tellTarget, языковые поля. Без шаблона он падает.
+  local ok, box = pcall(CreateFrame, "EditBox", "GMCommanderSender",
+                        UIParent, "ChatFrameEditBoxTemplate")
+  if not ok or not box then return nil end
+
+  box:Hide()
+  box:SetAutoFocus(false)
+  sender = box
+  return sender
+end
+
+--- Отправить строку так, чтобы клиент не счёл это защищённым действием.
+--
+-- Возвращает false, если штатный путь недоступен (нестандартный клиент,
+-- заменённый чат) — тогда остаётся прямой вызов.
+local function sendViaChatBox(text, channel, target)
+  local box = ensureSender()
+  if not box or not ChatEdit_SendText then return false end
+
+  box:SetAttribute("chatType", channel)
+  box:SetAttribute("tellTarget", target)
+  -- Те же поля, но обычными ключами: часть сборок 3.3.5a читает их
+  -- напрямую, а не через атрибуты.
+  box.chatType = channel
+  box.tellTarget = target
+  box.language = nil
+
+  -- В режиме шёпота клиент ждёт имя получателя в самом тексте:
+  -- ChatEdit_SendText берёт tellTarget, но собственный парсер строки
+  -- срабатывает раньше, если строка начинается с точки. Точку он
+  -- пропускает как есть — это и нужно.
+  box:SetText(text)
+
+  local ok = pcall(ChatEdit_SendText, box, 0)
+  box:SetText("")
+  return ok
+end
+
+--- Единственное место, где команда действительно уходит на сервер.
+function Comm:Dispatch(text)
+  local channel, target = self:PickChannel()
+
+  if sendViaChatBox(text, channel, target) then return true end
+
+  -- Запасной путь для клиентов без стандартного чата. Он же сработает,
+  -- если команду отправляют прямо из обработчика нажатия.
+  local ok = pcall(SendChatMessage, text, channel, nil, target)
+  if not ok then
+    ns.Print("|cffff5555Клиент заблокировал команду|r " .. text ..
+             " — отправьте её вручную через чат.")
+  end
+  return ok
+end
+
 pump:SetScript("OnUpdate", function()
   if #queue == 0 then return end
   local now = GetTime()
@@ -75,8 +153,7 @@ pump:SetScript("OnUpdate", function()
   local item = table.remove(queue, 1)
   lastSend = now
 
-  local channel, target = Comm:PickChannel()
-  SendChatMessage(item.text, channel, nil, target)
+  Comm:Dispatch(item.text)
 
   if ns.db and ns.db.echo and not item.quiet then
     ns.Print("|cff808080" .. item.text .. "|r")

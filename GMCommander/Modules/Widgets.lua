@@ -276,6 +276,106 @@ function W:EditBox(parent, placeholder, onEnter)
   return holder
 end
 
+--- Выпадающий список поверх кнопки.
+--
+-- UIDropDownMenu из 3.3.5a сюда не годится: он тянет за собой шаблон
+-- Blizzard с собственным фоном и шрифтом, и на полосе быстрых действий
+-- смотрелся бы чужеродно. Свой список короче и подчиняется теме.
+--
+-- @param owner   кнопка, к которой прижимается список
+-- @param items   { { text = "x5", value = 5, tip = "..." }, ... }
+-- @param onPick  function(item) — выбор из списка
+-- @param opts    { width, itemHeight, point, relPoint, x, y }
+--
+-- Список один на весь аддон: два открытых меню одновременно не нужны,
+-- а переиспользование избавляет от накопления фреймов (в 3.3.5a их
+-- нельзя удалить).
+function W:Dropdown(owner, items, onPick, opts)
+  opts = opts or {}
+  local width = opts.width or 64
+  local itemH = opts.itemHeight or 20
+
+  local menu = ns._dropdown
+  if not menu then
+    menu = CreateFrame("Frame", "GMCommanderDropdown", UIParent)
+    menu:SetFrameStrata("FULLSCREEN_DIALOG")
+    menu:EnableMouse(true)
+    T:Fill(menu, T.color.bg)
+    T:Border(menu, T.color.accent)
+    menu._rows = {}
+    menu:Hide()
+
+    -- Клик мимо списка закрывает его. OnHide вызывается и при закрытии
+    -- изнутри, поэтому обработчик снимаем именно там.
+    menu:SetScript("OnHide", function(self)
+      if self._closer then
+        self._closer:SetScript("OnMouseDown", nil)
+        self._closer:Hide()
+        self._closer:EnableMouse(false)
+      end
+    end)
+
+    ns._dropdown = menu
+  end
+
+  -- Уже открыт этой же кнопкой — второе нажатие закрывает.
+  if menu:IsVisible() and menu._owner == owner then
+    menu:Hide()
+    return menu
+  end
+
+  menu._owner = owner
+
+  -- Невидимая подложка на весь экран, чтобы поймать клик мимо.
+  local closer = menu._closer
+  if not closer then
+    closer = CreateFrame("Frame", nil, UIParent)
+    closer:SetAllPoints(UIParent)
+    closer:SetFrameStrata("FULLSCREEN")
+    menu._closer = closer
+  end
+  closer:EnableMouse(true)
+  closer:SetScript("OnMouseDown", function() menu:Hide() end)
+  closer:Show()
+
+  for i, item in ipairs(items) do
+    local row = menu._rows[i]
+    if not row then
+      row = CreateFrame("Button", nil, menu)
+      row._bg = T:Fill(row, T.color.bgLight)
+      T:Hover(row)
+      row._label = T:Text(row, "", 11)
+      row._label:SetPoint("CENTER")
+      menu._rows[i] = row
+    end
+
+    row:SetWidth(width - 2)
+    row:SetHeight(itemH)
+    row:SetPoint("TOPLEFT", 1, -1 - (i - 1) * itemH)
+    row._label:SetText(item.text)
+    row._bg:SetVertexColor(T.unpackc(item.active and T.color.accentDk or T.color.bgLight))
+    tooltip(row, item.tip and item.text or nil, item.tip)
+    row:SetScript("OnClick", function()
+      menu:Hide()
+      if onPick then onPick(item) end
+    end)
+    row:Show()
+  end
+
+  -- Лишние строки от прошлого открытия прячем: фреймы переиспользуются.
+  for i = #items + 1, #menu._rows do
+    menu._rows[i]:Hide()
+  end
+
+  menu:SetWidth(width)
+  menu:SetHeight(#items * itemH + 2)
+  menu:ClearAllPoints()
+  menu:SetPoint(opts.point or "BOTTOM", owner, opts.relPoint or "TOP",
+                opts.x or 0, opts.y or 2)
+  menu:Show()
+  return menu
+end
+
 --- Диалог подтверждения. Используем свой, а не StaticPopup: нужен свой стиль.
 function W:Confirm(title, body, onYes)
   local f = ns._confirm

@@ -16,6 +16,11 @@ local ACTIONS = {
     icon = "Interface\\Icons\\INV_Misc_Rune_06" },
   { cmd = "recall",     ru = "Назад",      icon = "Interface\\Icons\\Spell_Arcane_PortalStormWind" },
   { cmd = "gear repair", ru = "Починить",  icon = "Interface\\Icons\\Trade_BlackSmithing" },
+
+  -- Скорость — не одна команда, а выбор из нескольких. Отдельная
+  -- кнопка под каждое значение съела бы половину полосы, поэтому
+  -- здесь выпадающий список: одно нажатие открывает, второе выбирает.
+  { speed = true, ru = "Скорость", icon = "Interface\\Icons\\Ability_Rogue_Sprint" },
 }
 
 local SIZE, GAP, PADDING = 30, 3, 4
@@ -66,11 +71,37 @@ function ns.BuildBar()
     ic:SetTexture(a.icon)
     ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
-    b:SetScript("OnClick", function()
-      ns.DoAction(a)
-      Bar:Refresh()
-    end)
-    W.Tooltip(b, a.ru, a.toggle and "Переключатель — нажмите ещё раз, чтобы выключить." or nil)
+    if a.speed then
+      -- Подпись поверх иконки: множитель виден, не открывая список.
+      local sp = T:Text(b, "", 10)
+      sp:SetPoint("BOTTOMRIGHT", -1, 1)
+      b._speedLabel = sp
+
+      b:SetScript("OnClick", function(self)
+        local items = {}
+        for i, v in ipairs(ns.SPEED_STEPS) do
+          items[i] = {
+            text = "x" .. v,
+            value = v,
+            active = ns.db.speed == v,
+            tip = (v == 1 and "Вернуть обычную скорость."
+                           or "Ускоряет бег, полёт и плавание разом.") ..
+                  "\n\nКоманда: .modify speed " .. v,
+          }
+        end
+        W:Dropdown(self, items, function(item)
+          ns.SetSpeed(item.value)
+        end, { width = 46, itemHeight = 20 })
+      end)
+
+      W.Tooltip(b, a.ru, "Выбор множителя: бег, полёт и плавание разом.")
+    else
+      b:SetScript("OnClick", function()
+        ns.DoAction(a)
+        Bar:Refresh()
+      end)
+      W.Tooltip(b, a.ru, a.toggle and "Переключатель — нажмите ещё раз, чтобы выключить." or nil)
+    end
 
     b._bg, b._action = bg, a
     Bar.buttons[i] = b
@@ -95,6 +126,14 @@ function Bar:Refresh()
     if a.toggle then
       local on = ns.db.toggles[a.toggle] == true
       b._bg:SetVertexColor(T.unpackc(on and T.color.accentDk or T.color.bgLight))
+    elseif a.speed then
+      -- Обычная скорость — состояние по умолчанию, подсвечивать нечего.
+      local v = ns.db.speed or 1
+      local fast = v ~= 1
+      b._bg:SetVertexColor(T.unpackc(fast and T.color.accentDk or T.color.bgLight))
+      if b._speedLabel then
+        b._speedLabel:SetText(fast and ("x" .. v) or "")
+      end
     end
   end
 end

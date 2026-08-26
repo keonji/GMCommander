@@ -57,7 +57,7 @@ Frame.__index = Frame
 function Frame.new(ftype, name, parent)
   local f = setmetatable({
     _type = ftype, _name = name, _parent = parent,
-    _shown = true, _points = {}, _scripts = {}, _children = {},
+    _shown = true, _points = {}, _scripts = {}, _attr = {}, _children = {},
     _w = 100, _h = 20, _scale = 1, _alpha = 1,
   }, Frame)
   if name then _G[name] = f end
@@ -84,8 +84,17 @@ function Frame:SetScale(s) self._scale = s end
 function Frame:GetScale() return self._scale end
 function Frame:SetAlpha(a) self._alpha = a end
 function Frame:GetAlpha() return self._alpha end
-function Frame:Show() self._shown = true end
-function Frame:Hide() self._shown = false end
+function Frame:Show()
+  local was = self._shown
+  self._shown = true
+  if not was and self._scripts.OnShow then self._scripts.OnShow(self) end
+end
+
+function Frame:Hide()
+  local was = self._shown
+  self._shown = false
+  if was and self._scripts.OnHide then self._scripts.OnHide(self) end
+end
 function Frame:IsShown() return self._shown end
 function Frame:IsVisible() return self._shown end
 function Frame:EnableMouse() end
@@ -116,6 +125,9 @@ function Frame:SetTextColor() end
 function Frame:SetFontObject() end
 function Frame:SetText(t) self._text = tostring(t or "") end
 function Frame:GetText() return self._text or "" end
+
+function Frame:SetAttribute(k, v) self._attr[k] = v end
+function Frame:GetAttribute(k) return self._attr[k] end
 
 function Frame:SetScript(name, fn) self._scripts[name] = fn end
 function Frame:GetScript(name) return self._scripts[name] end
@@ -156,7 +168,11 @@ end
 
 ------------------------------------------------------------------ глобалы
 
-_G.CreateFrame = function(ftype, name, parent) return Frame.new(ftype, name, parent) end
+_G.CreateFrame = function(ftype, name, parent, template)
+  local f = Frame.new(ftype, name, parent)
+  f._template = template
+  return f
+end
 
 _G.UIParent = Frame.new("Frame", "UIParent")
 _G.GameTooltip = Frame.new("GameTooltip", "GameTooltip")
@@ -276,7 +292,27 @@ end
 -- Всё, что уходит «на сервер», собираем сюда для проверок.
 M.sent = {}
 _G.SendChatMessage = function(text, channel, lang, to)
+  -- Клиент 3.3.5a считает сообщение, начинающееся с точки, командой и
+  -- требует hardware event. Аддон обязан идти через ChatEdit_SendText,
+  -- поэтому прямой вызов с точкой здесь — ошибка, а не отправка.
+  if type(text) == "string" and text:sub(1, 1) == "." then
+    M.blocked = (M.blocked or 0) + 1
+    error("ADDON_ACTION_BLOCKED: " .. text, 0)
+  end
   table.insert(M.sent, { text = text, channel = channel, to = to })
+end
+
+--- Штатная отправка через строку ввода чата. Команду с точкой сервер
+--- перехватывает до чата, поэтому канал для неё роли не играет.
+_G.ChatEdit_SendText = function(box, addHistory)
+  local text = box:GetText()
+  if not text or text == "" then return end
+  table.insert(M.sent, {
+    text = text,
+    channel = box:GetAttribute("chatType"),
+    to = box:GetAttribute("tellTarget"),
+    viaChatBox = true,
+  })
 end
 _G.SendAddonMessage = function(prefix, text, channel, to)
   table.insert(M.sent, { addon = true, prefix = prefix, text = text, channel = channel, to = to })

@@ -130,6 +130,31 @@ wow.now = wow.now + 10
 wow.Tick()
 eq(#wow.sent, 2, "вторая уходит после паузы")
 
+-- Защита клиента. В 3.3.5a SendChatMessage для строки, начинающейся с
+-- точки, — защищённая функция: вне «hardware event» клиент отвечает
+-- «AddOn пытается выполнить защищённое действие». Очередь работает из
+-- OnUpdate, где такого контекста нет, поэтому команды обязаны уходить
+-- штатной строкой ввода чата (ChatEdit_SendText), как их отправляет
+-- сам клиент. Стаб роняет прямой вызов, так что эти проверки поймают
+-- возврат к нему.
+wow.blocked = 0
+ns.Comm:Clear()
+ns.Run("revive")
+local sProt = flush()
+ok(sProt[1] and sProt[1].viaChatBox, "команда уходит через строку ввода чата")
+eq(wow.blocked, 0, "прямой защищённый вызов не используется")
+
+-- Шёпот в виде духа идёт тем же путём и с тем же получателем.
+wow.world.player.dead = true
+ns.Comm:Clear()
+ns.Run("revive")
+local sProtD = flush()
+ok(sProtD[1] and sProtD[1].viaChatBox, "и в виде духа тоже через строку ввода")
+eq(sProtD[1] and sProtD[1].to, wow.world.player.name,
+   "получатель шёпота передан строке ввода")
+eq(wow.blocked, 0, "защищённый вызов не понадобился и мёртвому")
+wow.world.player.dead = false
+
 --------------------------------------------- команды в виде духа
 
 print("\n\27[1mКоманды после смерти\27[0m")
@@ -321,6 +346,41 @@ ns.SetSpeed(ns.SPEED_MAX)
 eq(lastCmd(), ".modify speed 50", "граничное значение принимается")
 
 ok(#ns.SPEED_STEPS >= 4, "быстрые кнопки скорости заданы")
+
+-- Кнопка скорости на полосе быстрых действий. Отдельной кнопки под
+-- каждое значение нет — одна кнопка открывает список.
+local speedBtn
+for _, b in ipairs(ns.Bar.buttons or {}) do
+  if b._action and b._action.speed then speedBtn = b end
+end
+ok(speedBtn ~= nil, "на полосе есть кнопка скорости")
+
+wow.Click(speedBtn)
+local menu = ns._dropdown
+ok(menu and menu:IsVisible(), "нажатие открывает список")
+eq(#ns.SPEED_STEPS, 4, "в списке четыре множителя")
+
+-- Второе нажатие по той же кнопке закрывает список.
+wow.Click(speedBtn)
+ok(not menu:IsVisible(), "повторное нажатие закрывает список")
+
+-- Выбор из списка отправляет команду и запоминает значение.
+wow.Click(speedBtn)
+ns.Comm:Clear()
+local row10
+for _, r in ipairs(menu._rows) do
+  if r:IsVisible() and r._label:GetText() == "x10" then row10 = r end
+end
+ok(row10 ~= nil, "в списке есть x10")
+wow.Click(row10)
+eq(lastCmd(), ".modify speed 10", "выбор из списка отправляет команду")
+eq(ns.db.speed, 10, "выбранная скорость запомнена")
+ok(not menu:IsVisible(), "после выбора список закрывается")
+eq(speedBtn._speedLabel:GetText(), "x10", "множитель подписан на кнопке")
+
+-- Возврат к обычной скорости подпись убирает: x1 — состояние по умолчанию.
+ns.SetSpeed(1)
+eq(speedBtn._speedLabel:GetText(), "", "при x1 подпись пустая")
 
 ---------------------------------------------------------- квесты
 

@@ -158,7 +158,11 @@ function ns.SetSpeed(value)
     return
   end
   ns.Run("modify speed " .. value)
+  -- Сервер текущую скорость не сообщает, поэтому запоминаем сами —
+  -- иначе полосе быстрых действий нечего показать.
+  ns.db.speed = value
   ns.Print(string.format("Скорость %s: x%s", ns.TargetLabel(), value))
+  if ns.Bar and ns.Bar.Refresh then ns.Bar:Refresh() end
 end
 
 --------------------------------------------------------------------------

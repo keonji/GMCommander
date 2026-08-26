@@ -35,8 +35,14 @@ local function scan(path)
   fh:close()
 end
 
+-- Себя не проверяем: таблица выше по необходимости содержит ровно те
+-- символы, которые ищет проверка.
+local SELF = "check_glyphs.lua"
+
 local pipe = io.popen('find "' .. root .. '" -name "*.lua" -o -name "*.toc"')
-for path in pipe:lines() do scan(path) end
+for path in pipe:lines() do
+  if not path:find(SELF, 1, true) then scan(path) end
+end
 pipe:close()
 
 if found == 0 then
