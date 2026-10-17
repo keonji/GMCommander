@@ -171,6 +171,9 @@ end
 _G.CreateFrame = function(ftype, name, parent, template)
   local f = Frame.new(ftype, name, parent)
   f._template = template
+  if template == "ChatFrameEditBoxTemplate" and not f.chatFrame then
+    error("ChatFrame.lua:3306: attempt to index field 'chatFrame' (a nil value)")
+  end
   return f
 end
 

@@ -80,7 +80,7 @@ end
 -- Штатный путь, которым сам клиент отправляет GM-команды, — строка
 -- ввода чата: ChatEdit_SendText разбирает текст и вызывает защищённую
 -- часть уже из доверенного кода. Своей строке достаточно быть скрытой
--- и наследовать шаблон ChatFrameEditBoxTemplate — видимый чат при этом
+-- без шаблона ChatFrameEditBoxTemplate — видимый чат при этом
 -- не трогается: команда не появится ни в одном окне, потому что сервер
 -- перехватит её по точке.
 
@@ -89,10 +89,10 @@ local sender
 local function ensureSender()
   if sender then return sender end
 
-  -- Шаблон даёт ChatEdit_SendText всё, на что он рассчитывает:
-  -- chatType, tellTarget, языковые поля. Без шаблона он падает.
+  -- Шаблон ChatFrameEditBoxTemplate запускает ChatEdit_OnLoad до того,
+  -- как отдельному полю можно назначить chatFrame.
   local ok, box = pcall(CreateFrame, "EditBox", "GMCommanderSender",
-                        UIParent, "ChatFrameEditBoxTemplate")
+                        UIParent)
   if not ok or not box then return nil end
 
   box:Hide()
