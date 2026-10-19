@@ -143,7 +143,7 @@ function page.refresh()
   -- Подсвечиваем включённые режимы.
   for _, rec in ipairs(actionButtons) do
     if rec.action.toggle then
-      rec.button:SetAccent(ns.db.toggles[rec.action.toggle] == true)
+      rec.button:SetAccent(ns.IsActionOn(rec.action))
     end
   end
 

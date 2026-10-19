@@ -5,6 +5,15 @@ local T, W = ns.Theme, ns.W
 local page = { title = "Настройки" }
 
 function page.build(parent)
+  local footer = parent
+  local scroll, content = W:ScrollArea(parent)
+  scroll:SetPoint("TOPLEFT", 0, 0)
+  scroll:SetPoint("BOTTOMRIGHT", 0, 44)
+  content:SetWidth(460)
+  scroll:SetScript("OnSizeChanged", function(self, width)
+    content:SetWidth(width)
+  end)
+  parent = content
   local pad = 14
   local y = pad
   local function nextY(h) local v = y; y = y + h; return -v end
@@ -96,7 +105,9 @@ function page.build(parent)
   rights:SetJustifyH("LEFT")
 
   ------------------------------------------------------------- сброс
-  local reset = W:Button(parent, {
+  content:SetHeight(y + 8)
+
+  local reset = W:Button(footer, {
     text = "Сбросить настройки", width = 150, height = 22,
     onClick = function()
       W:Confirm("Сброс",
@@ -109,7 +120,7 @@ function page.build(parent)
   })
   reset:SetPoint("BOTTOMLEFT", pad, 12)
 
-  local ver = T:Text(parent, "GMCommander " .. ns.VERSION, 9, T.color.textDim)
+  local ver = T:Text(footer, "GMCommander " .. ns.VERSION, 9, T.color.textDim)
   ver:SetPoint("BOTTOMRIGHT", -pad, 18)
 end
 

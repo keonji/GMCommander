@@ -374,7 +374,7 @@ end
 ok(row10 ~= nil, "в списке есть x10")
 wow.Click(row10)
 eq(lastCmd(), ".modify speed 10", "выбор из списка отправляет команду")
-eq(ns.db.speed, 10, "выбранная скорость запомнена")
+eq(ns.GetSpeed(), 10, "выбранная скорость запомнена")
 ok(not menu:IsVisible(), "после выбора список закрывается")
 eq(speedBtn._speedLabel:GetText(), "x10", "множитель подписан на кнопке")
 
@@ -520,12 +520,41 @@ ok(flyAction ~= nil, "действие «Полёт» найдено")
 ns.Comm:Clear()
 ns.DoAction(flyAction)
 eq(lastCmd(), ".gm fly on", "первое нажатие включает")
-eq(ns.db.toggles["gm fly"], true, "состояние запомнено")
+eq(ns.IsActionOn(flyAction), true, "состояние запомнено")
 
 ns.Comm:Clear()
 ns.DoAction(flyAction)
 eq(lastCmd(), ".gm fly off", "второе нажатие выключает")
-eq(ns.db.toggles["gm fly"], false, "состояние обновлено")
+eq(ns.IsActionOn(flyAction), false, "состояние обновлено")
+
+wow.world.target = { name = "Первый", guid = "Player-1", level = 40 }
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly on", "полёт включается первому игроку")
+ns.SetSpeed(5)
+lastCmd()
+wow.world.target = { name = "Второй", guid = "Player-2", level = 40 }
+wow.Fire("PLAYER_TARGET_CHANGED")
+eq(speedBtn._speedLabel:GetText(), "", "скорость другой цели не наследуется")
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly on", "полёт другой цели включается независимо")
+ns.SetSpeed(3)
+lastCmd()
+wow.world.target = { name = "Первый", guid = "Player-1", level = 40 }
+wow.Fire("PLAYER_TARGET_CHANGED")
+eq(speedBtn._speedLabel:GetText(), "x5", "при возврате к цели восстанавливается её скорость")
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly off", "повторный выбор игрока сохраняет его полёт")
+wow.world.target = nil
+wow.Fire("PLAYER_TARGET_CHANGED")
+eq(ns.GetSpeed(), 1, "своя скорость не изменилась")
+wow.world.target = wow.world.player
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly on", "выбор себя использует своё состояние")
+wow.world.target = { name = "Кабан", guid = "Creature-1", isNPC = true }
+ns.DoAction(flyAction)
+eq(lastCmd(), ".gm fly off", "NPC использует то же состояние своего персонажа")
+wow.world.target = nil
+
 
 --------------------------------------------------------- предметы
 
@@ -734,6 +763,24 @@ ns.db.favorites = {}
 ns.UI:Select(2)
 s2, e2 = pcall(function() ns.UI:Refresh() end)
 ok(s2, "пустое избранное не ломает список" .. (s2 and "" or ": " .. tostring(e2)))
+
+do
+  local learnPage
+  for _, p in ipairs(ns.UI.pages) do
+    if p.title == "Обучение" then learnPage = p end
+  end
+  local learnButton, skillButton
+  for _, f in ipairs(wow.frames) do
+    if f._label and f._label:GetText() == "Выучить" then learnButton = f end
+    if f._label and f._label:GetText() == "Все навыки на максимум" then skillButton = f end
+  end
+  local lp, _, ly = unpack(learnButton._points[1])
+  local sp, _, sy = unpack(skillButton._points[1])
+  ok(lp == "TOPLEFT" and sp == "TOPLEFT" and sy + skillButton:GetHeight() < ly - 52,
+    "навыки расположены ниже полей отдельного заклинания")
+  ok(skillButton._parent ~= learnPage.frame and skillButton._parent._parent._type == "ScrollFrame",
+    "содержимое обучения доступно через прокрутку")
+end
 
 --------------------------------------------------------------------- итог
 

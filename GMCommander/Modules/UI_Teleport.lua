@@ -152,17 +152,18 @@ function page.build(parent)
   -- Список.
   scroll, content = W:ScrollArea(parent)
   scroll:SetPoint("TOPLEFT", pad, -pad - 56)
-  scroll:SetPoint("BOTTOMRIGHT", -pad, 76)
+  scroll:SetPoint("BOTTOMRIGHT", -pad, 98)
   content:SetWidth(430)
 
   ----------------------------------------------------------- квесты
   local qHead = T:Text(parent, "Квесты", 11, T.color.accent)
-  qHead:SetPoint("BOTTOMLEFT", pad, 56)
+  qHead:SetPoint("BOTTOMLEFT", pad, 78)
 
   local qNote = T:Text(parent,
-    "К самой цели квеста прыгнуть нельзя — координат целей у клиента нет. " ..
-    "Но можно к тому, кто квест даёт или принимает.", 9, T.color.textDim)
-  qNote:SetPoint("BOTTOMLEFT", pad, 40)
+    "Координаты целей квеста недоступны. Можно прыгнуть\n" ..
+    "к тому, кто выдаёт или принимает квест.", 9, T.color.textDim)
+  qNote:SetPoint("BOTTOMLEFT", pad, 44)
+  qNote:SetHeight(26)
   qNote:SetPoint("RIGHT", parent, "RIGHT", -pad, 0)
   qNote:SetJustifyH("LEFT")
 
@@ -171,10 +172,10 @@ function page.build(parent)
     if id then ns.GoQuest(id, "starter") end
   end)
   questEdit:SetPoint("BOTTOMLEFT", pad, 12)
-  questEdit:SetWidth(110)
+  questEdit:SetWidth(80)
 
   local toStarter = W:Button(parent, {
-    text = "К квестгиверу", width = 128, height = 24,
+    text = "К квестгиверу", width = 120, height = 24,
     tip = "Прыжок к тому, кто выдаёт квест",
     tipBody = "Команда: .go quest starter <id>",
     onClick = function()
@@ -183,10 +184,10 @@ function page.build(parent)
       else ns.Print("Введите числовой ID квеста.") end
     end,
   })
-  toStarter:SetPoint("BOTTOMLEFT", pad + 116, 12)
+  toStarter:SetPoint("BOTTOMLEFT", pad + 86, 12)
 
   local toEnder = W:Button(parent, {
-    text = "К принимающему", width = 138, height = 24,
+    text = "К принимающему", width = 136, height = 24,
     tip = "Прыжок к тому, кто квест принимает",
     tipBody = "Команда: .go quest ender <id>",
     onClick = function()
@@ -195,7 +196,7 @@ function page.build(parent)
       else ns.Print("Введите числовой ID квеста.") end
     end,
   })
-  toEnder:SetPoint("BOTTOMLEFT", pad + 248, 12)
+  toEnder:SetPoint("BOTTOMLEFT", pad + 212, 12)
 
   local recall = W:Button(parent, {
     text = "Назад", width = 60, height = 24,

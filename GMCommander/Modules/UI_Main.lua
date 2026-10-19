@@ -243,7 +243,10 @@ end
 do
   local ev = CreateFrame("Frame")
   ev:RegisterEvent("PLAYER_TARGET_CHANGED")
-  ev:SetScript("OnEvent", function() UI:Refresh() end)
+  ev:SetScript("OnEvent", function()
+    UI:Refresh()
+    if ns.Bar then ns.Bar:Refresh() end
+  end)
 end
 
 function ns.ToggleUI()

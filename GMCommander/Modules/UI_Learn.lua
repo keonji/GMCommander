@@ -6,6 +6,14 @@ local page = { title = "Обучение" }
 local spellEdit
 
 function page.build(parent)
+  local scroll, content = W:ScrollArea(parent)
+  scroll:SetPoint("TOPLEFT", 0, 0)
+  scroll:SetPoint("BOTTOMRIGHT", 0, 0)
+  content:SetWidth(460)
+  scroll:SetScript("OnSizeChanged", function(self, width)
+    content:SetWidth(width)
+  end)
+  parent = content
   local pad = 14
 
   --------------------------------------------------------- профессии
@@ -130,8 +138,9 @@ function page.build(parent)
   ------------------------------------------------------------- навыки
   -- Три кнопки в один ряд давали 512 пикселей при доступных 432 и
   -- вылезали за окно. Разложены в два ряда.
+  local afterSpell = afterBulk + 82
   local skills = T:Text(parent, "Навыки и сбросы", 11, T.color.accent)
-  skills:SetPoint("BOTTOMLEFT", pad, 74)
+  skills:SetPoint("TOPLEFT", pad, -afterSpell)
 
   local maxAll = W:Button(parent, {
     text = "Все навыки на максимум", width = 210, height = 24,
@@ -139,7 +148,7 @@ function page.build(parent)
     tipBody = "Команда: .maxskill",
     onClick = function() ns.Run("maxskill") end,
   })
-  maxAll:SetPoint("BOTTOMLEFT", pad, 44)
+  maxAll:SetPoint("TOPLEFT", pad, -afterSpell - 22)
 
   local talents = W:Button(parent, {
     text = "Сбросить таланты", width = 210, height = 24,
@@ -147,7 +156,7 @@ function page.build(parent)
     tipBody = "Команда: .reset talents",
     onClick = function() ns.Run("reset talents") end,
   })
-  talents:SetPoint("BOTTOMLEFT", pad + 216, 44)
+  talents:SetPoint("TOPLEFT", pad + 216, -afterSpell - 22)
 
   local spellsReset = W:Button(parent, {
     text = "Сбросить заклинания", width = 210, height = 24,
@@ -155,7 +164,7 @@ function page.build(parent)
     tipBody = "Команда: .reset spells",
     onClick = function() ns.Run("reset spells") end,
   })
-  spellsReset:SetPoint("BOTTOMLEFT", pad, 16)
+  spellsReset:SetPoint("TOPLEFT", pad, -afterSpell - 50)
 
   local statsReset = W:Button(parent, {
     text = "Сбросить характеристики", width = 210, height = 24,
@@ -163,7 +172,8 @@ function page.build(parent)
     tipBody = "Команда: .reset stats",
     onClick = function() ns.Run("reset stats") end,
   })
-  statsReset:SetPoint("BOTTOMLEFT", pad + 216, 16)
+  statsReset:SetPoint("TOPLEFT", pad + 216, -afterSpell - 50)
+  content:SetHeight(afterSpell + 74 + pad)
 end
 
 function page.refresh() end

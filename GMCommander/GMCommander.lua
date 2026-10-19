@@ -72,12 +72,37 @@ end
 -- Действия
 --------------------------------------------------------------------------
 
+local movementStates = {}
+
+local function movementState()
+  -- Сервер применяет эти команды к выделенному игроку, иначе к себе.
+  local unit = ns.TargetIsPlayer() and "target" or "player"
+  local key = UnitGUID(unit)
+  if not movementStates[key] then movementStates[key] = {} end
+  return movementStates[key]
+end
+
+function ns.IsActionOn(action)
+  if action.toggle == "gm fly" then
+    return movementState().fly == true
+  end
+  return ns.db.toggles[action.toggle] == true
+end
+
+function ns.GetSpeed()
+  return movementState().speed or 1
+end
+
 --- Выполнить запись из ns.ACTIONS с учётом переключателей и цели.
 function ns.DoAction(action)
   -- Переключатели: помним состояние и шлём противоположное.
   if action.toggle then
-    local on = not ns.db.toggles[action.toggle]
-    ns.db.toggles[action.toggle] = on
+    local on = not ns.IsActionOn(action)
+    if action.toggle == "gm fly" then
+      movementState().fly = on
+    else
+      ns.db.toggles[action.toggle] = on
+    end
     ns.Run(action.toggle .. (on and " on" or " off"))
     ns.Print(action.ru .. ": " .. (on and "|cff5cd95cвключено|r" or "|cffff5555выключено|r"))
     -- Один и тот же режим есть и в окне, и на полосе — обновляем оба,
@@ -160,7 +185,7 @@ function ns.SetSpeed(value)
   ns.Run("modify speed " .. value)
   -- Сервер текущую скорость не сообщает, поэтому запоминаем сами —
   -- иначе полосе быстрых действий нечего показать.
-  ns.db.speed = value
+  movementState().speed = value
   ns.Print(string.format("Скорость %s: x%s", ns.TargetLabel(), value))
   if ns.Bar and ns.Bar.Refresh then ns.Bar:Refresh() end
 end

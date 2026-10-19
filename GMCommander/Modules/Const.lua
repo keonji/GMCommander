@@ -7,7 +7,7 @@
 
 local ADDON, ns = ...
 
-ns.VERSION = "1.0.0"
+ns.VERSION = "1.0.2"
 
 --------------------------------------------------------------------------
 -- Быстрые действия
@@ -62,7 +62,7 @@ ns.ACTIONS = {
   },
   {
     cmd = "gm fly on", ru = "Полёт", toggle = "gm fly",
-    icon = "Interface\\Icons\\Ability_Mount_WyvernElite",
+    icon = "Interface\\Icons\\Spell_Magic_FeatherFall",
     desc = "Свободный полёт в любой локации.",
   },
   {

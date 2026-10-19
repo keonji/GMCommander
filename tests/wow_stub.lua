@@ -213,6 +213,11 @@ local function resolve(unit)
 end
 M.resolve = resolve
 
+_G.UnitGUID = function(unit)
+  local m = resolve(unit)
+  return m and (m.guid or m.name)
+end
+
 _G.UnitName = function(unit)
   local m = resolve(unit)
   return m and m.name

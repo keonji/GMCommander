@@ -2,7 +2,7 @@
 ## Title: |cffffcc00GM|rCommander
 ## Notes: Панель GM-команд для AzerothCore 3.3.5a
 ## Author: keonji
-## Version: 1.0.0
+## Version: 1.0.2
 ## SavedVariables: GMCommanderDB
 
 Modules\Compat.lua

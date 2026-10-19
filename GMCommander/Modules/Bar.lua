@@ -9,7 +9,7 @@ ns.Bar = Bar
 local ACTIONS = {
   { cmd = "revive",     ru = "Воскресить", icon = "Interface\\Icons\\Spell_Holy_Resurrection" },
   { cmd = "gm fly on",  ru = "Полёт",      toggle = "gm fly",
-    icon = "Interface\\Icons\\Ability_Mount_WyvernElite" },
+    icon = "Interface\\Icons\\Spell_Magic_FeatherFall" },
   { cmd = "cheat god on", ru = "Бессмертие", toggle = "cheat god",
     icon = "Interface\\Icons\\Spell_Holy_DevineAegis" },
   { cmd = "gm on",      ru = "Режим ГМ",   toggle = "gm",
@@ -83,7 +83,7 @@ function ns.BuildBar()
           items[i] = {
             text = "x" .. v,
             value = v,
-            active = ns.db.speed == v,
+            active = ns.GetSpeed() == v,
             tip = (v == 1 and "Вернуть обычную скорость."
                            or "Ускоряет бег, полёт и плавание разом.") ..
                   "\n\nКоманда: .modify speed " .. v,
@@ -124,11 +124,11 @@ function Bar:Refresh()
   for _, b in ipairs(self.buttons) do
     local a = b._action
     if a.toggle then
-      local on = ns.db.toggles[a.toggle] == true
+      local on = ns.IsActionOn(a)
       b._bg:SetVertexColor(T.unpackc(on and T.color.accentDk or T.color.bgLight))
     elseif a.speed then
       -- Обычная скорость — состояние по умолчанию, подсвечивать нечего.
-      local v = ns.db.speed or 1
+      local v = ns.GetSpeed()
       local fast = v ~= 1
       b._bg:SetVertexColor(T.unpackc(fast and T.color.accentDk or T.color.bgLight))
       if b._speedLabel then
