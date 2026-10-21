@@ -607,6 +607,46 @@ for _, p in ipairs(ns.PROFESSIONS) do
 end
 eq(dupes, 0, "ID профессий не повторяются")
 
+-------------------------------------------------------- сбросы
+
+print("\n\27[1mСбросы персонажа\27[0m")
+
+-- `.reset talents` и `.reset stats` без имени персонажа сервер
+-- отвергает: подстановки выделенной цели у них нет, в отличие от
+-- `.reset spells` (cs_reset.cpp:230 и 209 против 174).
+wow.world.target = nil
+ns.Comm:Clear()
+ns.ResetCharacter("talents")
+eq(lastCmd(), ".reset talents " .. wow.world.player.name,
+   "сброс талантов уходит с именем персонажа")
+
+ns.Comm:Clear()
+ns.ResetCharacter("stats")
+eq(lastCmd(), ".reset stats " .. wow.world.player.name,
+   "сброс характеристик тоже именной")
+
+wow.world.target = { name = "Пётр", level = 40, class = "MAGE" }
+ns.Comm:Clear()
+ns.ResetCharacter("talents")
+eq(lastCmd(), ".reset talents Пётр", "с выделенным игроком подставлено его имя")
+
+-- NPC в качестве цели сервер персонажем не считает, поэтому его имя
+-- подставлять нельзя.
+wow.world.target = { name = "Кабан", level = 5, class = "WARRIOR", isNPC = true }
+ns.Comm:Clear()
+ns.ResetCharacter("talents")
+eq(lastCmd(), ".reset talents " .. wow.world.player.name,
+   "имя выделенного NPC не подставляется")
+
+ns.db.applyToTarget = false
+wow.world.target = { name = "Пётр", level = 40, class = "MAGE" }
+ns.Comm:Clear()
+ns.ResetCharacter("talents")
+eq(lastCmd(), ".reset talents " .. wow.world.player.name,
+   "при снятой галочке сброс идёт себе")
+ns.db.applyToTarget = true
+wow.world.target = nil
+
 -------------------------------------------------------- телепорты
 
 print("\n\27[1mТелепорты\27[0m")

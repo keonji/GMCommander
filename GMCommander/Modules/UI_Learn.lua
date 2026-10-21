@@ -153,24 +153,24 @@ function page.build(parent)
   local talents = W:Button(parent, {
     text = "Сбросить таланты", width = 210, height = 24,
     tip = "Обнулить распределение талантов",
-    tipBody = "Команда: .reset talents",
-    onClick = function() ns.Run("reset talents") end,
+    tipBody = "Команда: .reset talents <имя персонажа>",
+    onClick = function() ns.ResetCharacter("talents") end,
   })
   talents:SetPoint("TOPLEFT", pad + 216, -afterSpell - 22)
 
   local spellsReset = W:Button(parent, {
     text = "Сбросить заклинания", width = 210, height = 24,
     tip = "Вернуть книгу заклинаний к стартовой",
-    tipBody = "Команда: .reset spells",
-    onClick = function() ns.Run("reset spells") end,
+    tipBody = "Команда: .reset spells <имя персонажа>",
+    onClick = function() ns.ResetCharacter("spells") end,
   })
   spellsReset:SetPoint("TOPLEFT", pad, -afterSpell - 50)
 
   local statsReset = W:Button(parent, {
     text = "Сбросить характеристики", width = 210, height = 24,
     tip = "Пересчитать базовые характеристики",
-    tipBody = "Команда: .reset stats",
-    onClick = function() ns.Run("reset stats") end,
+    tipBody = "Команда: .reset stats <имя персонажа>",
+    onClick = function() ns.ResetCharacter("stats") end,
   })
   statsReset:SetPoint("TOPLEFT", pad + 216, -afterSpell - 50)
   content:SetHeight(afterSpell + 74 + pad)
